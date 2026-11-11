@@ -1705,9 +1705,24 @@ function handleResponse(response) {
 
     switch (response.action) {
         case 'init':
-            tickersInfo = response.data;
+                        tickersInfo = response.data;
+            // Deep-link patch (see PATCH_NOTES.md): support ?ticker=XXX&t=<unix seconds>
+            // in addition to the native ?timestamp= freeze-link parameter.
+            // `t` is expressed in the server's epoch (ET wall time treated as UTC,
+            // the same epoch consumers.py uses for bar times); the native
+            // `timestamp` parameter, when present, takes precedence.
+            const deepLinkParams = (new URL(window.location.href)).searchParams;
+            const deepLinkTicker = deepLinkParams.get('ticker');
+            if (deepLinkTicker && tickersInfo.hasOwnProperty(deepLinkTicker.toUpperCase())) {
+                configs.ticker = deepLinkTicker.toUpperCase();
+            }
             setCurrentTicker(configs.ticker);
-            const paramTimestamp = (new URL(window.location.href)).searchParams.get('timestamp');
+            let paramTimestamp = deepLinkParams.get('timestamp');
+            const deepLinkT = deepLinkParams.get('t');
+            if (paramTimestamp == null && deepLinkT != null && deepLinkT !== '' && isFinite(Number(deepLinkT))) {
+                // sendGotoAction() expects a client timestamp, so convert first.
+                paramTimestamp = convertServerTimestampToClientTimestamp(Number(deepLinkT));
+            }
             sendGotoAction(paramTimestamp);
             break;
 
